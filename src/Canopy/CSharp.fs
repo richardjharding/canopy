@@ -1,53 +1,52 @@
 ﻿namespace Canopy.CSharp
 
-open Canopy.Runner
 open Canopy
 open Canopy.Operators
-open Canopy.Assert
-open Canopy.Assert.Operators
+open Canopy.Runner
+open Canopy.Runner.Runner
+open Canopy.Runner.Runner.Operators
+open Canopy.Expect
+open Canopy.Expect.Operators
 
 type Canopy() =
 
     static member browsers =
-        match !Context.globalContext with
-        | Some ctx ->
-            ctx.browsers
-        | None ->
-            failwith "Canopy is not yet configured"
+        Context.getContext().browsers
 
     static member browser =
-        match !Context.globalContext with
-        | Some ctx when Option.isSome ctx.browser ->
-            Option.get ctx.browser
-        | _ ->
-            failwith "Canopy is not yet configured"
+        match Context.getContext().browser with
+        | Some browser ->
+            browser
+        | None ->
+            failwith "Canopy is not yet configured with a browser"
 
     //runner stuff
-    static member context description = context description
+    static member context description = Runner.context description
 
-    static member once (f : System.Action) = once (fun _ -> f.Invoke())
+    static member once (f: System.Action) = Runner.once (fun _ -> f.Invoke())
 
-    static member before (f : System.Action) = before (fun _ -> f.Invoke())
+    static member before (f : System.Action) = Runner.before (fun _ -> f.Invoke())
 
-    static member after (f : System.Action) = after (fun _ -> f.Invoke())
+    static member after (f : System.Action) = Runner.after (fun _ -> f.Invoke())
 
-    static member lastly (f : System.Action) = lastly (fun _ -> f.Invoke())
+    static member lastly (f : System.Action) = Runner.lastly (fun _ -> f.Invoke())
 
-    static member onPass (f : System.Action) = onPass (fun _ -> f.Invoke())
+    static member onPass (f : System.Action) = Runner.onPass (fun _ -> f.Invoke())
 
-    static member onFail (f : System.Action) = onFail (fun _ -> f.Invoke())
+    static member onFail (f : System.Action) = Runner.onFail (fun _ -> f.Invoke())
 
     static member test description (f : System.Action) = description &&& fun _ -> f.Invoke()
 
     static member wip description (f : System.Action) = description &&&& fun _ -> f.Invoke()
 
-    static member skip description (f : System.Action) = description &&! Runner.skipped
+    static member skip description (f : System.Action) = description &&! CanopyRunnerConfig.skipped
 
     static member run () = Runner.run ()
 
     static member runFor browsers = Runner.runFor browsers
 
     //core stuff
+    static member start (config, b) = startWithConfig config b
     static member start b = start b
 
     static member pin direction = pin direction
@@ -94,9 +93,14 @@ type Canopy() =
 
     static member describe text = describe text
 
-    static member waitFor2 message (f : System.Predicate<obj>) = waitFor2 message (fun _ -> f.Invoke())
+    static member waitForMessage message (f: System.Predicate<obj>) =
+        waitForMessage message (fun _ -> f.Invoke())
 
-    static member waitFor (f : System.Predicate<obj>) = waitFor (fun _ -> f.Invoke())
+    static member waitFor2 message (f: System.Predicate<obj>) =
+        waitForMessage message (fun _ -> f.Invoke())
+
+    static member waitFor (f : System.Predicate<obj>) =
+        waitFor (fun _ -> f.Invoke())
 
     static member waitForElement selector = waitForElement selector
 
@@ -147,7 +151,7 @@ type Canopy() =
 
     static member clear selector = clear selector
 
-    static member write selector value = write selector value
+    static member write selector value = write value selector
 
     static member click selector = click selector
 

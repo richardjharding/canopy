@@ -3,18 +3,22 @@
 open System
 open Canopy.Logging
 
-//// TODO: remove global mutable
-//let mutable (failureMessage : string) = null
-//
-//// TODO: remove global mutable
-//let mutable wipTest = false
-
 //misc
 (* documented/actions *)
-//let failsWith message =
-//    // TODO: handle write to global via `Configuration`
-//    failureMessage <- message
-
+/// For chrome you need to download chromedriver.exe from
+/// http://code.google.com/p/chromedriver/wiki/GettingStarted
+///
+/// Place chromedriver.exe in c:\ or you can place it in a custom location and
+/// set the chromeDir field.
+///
+/// For IE you need to set `Settings -> Advance -> Security Section ->
+/// Check-Allow active content` to run files on My Computer* also download
+/// IEDriverServer and place in c:\ or configure with ieDir.
+///
+/// Firefox just works.
+///
+/// Safari: download it and put in c:\ or configure with safariDir
+///
 type CanopyPaths =
     {
         chromeDir: string
@@ -41,7 +45,6 @@ type CanopyConfig =
         optimizeBySkippingIFrameCheck: bool
         optimizeByDisablingClearBeforeWrite: bool
         showInfoDiv: bool
-        failureMessage: string option
         /// Whether to throw an exception is a global static variable is queried
         /// by the DSL; enable this when you run with Expecto to support parallel
         /// tests.
@@ -93,10 +96,13 @@ module CanopyConfig =
             optimizeBySkippingIFrameCheck = false
             optimizeByDisablingClearBeforeWrite = false
             showInfoDiv = true
-            failureMessage = None
             throwOnStatics = false
-            logLevelOnStatics = Verbose
+            logLevelOnStatics = Info
         }
+
+    (* documented/configuration *)
+    let setLogLevel logLevel (config: CanopyConfig) =
+        { config with logger = Targets.create logLevel [| "Canopy" |] }
 
     (* documented/configuration *)
     let setHideCommandPromptWindow shouldHide (config: CanopyConfig) =
@@ -131,8 +137,23 @@ module CanopyConfig =
         { config with throwIfMoreThanOneElement = enabled }
 
     (* documented/configuration *)
+    let setThrowOnStatics enabled (config: CanopyConfig) =
+        { config with throwOnStatics = enabled }
+
+    (* documented/configuration *)
+    let setWarnLevelOnStatics logLevel (config: CanopyConfig) =
+        { config with logLevelOnStatics = logLevel }
+
+    (* documented/configuration *)
     let setFinders finders (config: CanopyConfig) =
         { config with finders = finders }
+
+    (* documented/configuration *)
+    let addFinder finder (config: CanopyConfig) =
+        let composed cssSelector f =
+            config.finders cssSelector f
+            |> Seq.append (seq { yield finder cssSelector f })
+        { config with finders = composed }
 
     (* documented/configuration *)
     let setOptimizeBySkippingIFrameCheck enabled (config: CanopyConfig) =
@@ -167,3 +188,11 @@ module CanopyConfig =
     (* documented/configuration *)
     let setEdgeDir path (config: CanopyConfig) =
         { config with paths = { config.paths with edgeDir = path } }
+
+    type CanopyConfig with
+        member internal x.configureOp name fn: WaitOp<'ok, 'error> =
+            let xA =
+                async {
+                    return fn ()
+                }
+            WaitOp<_, _>.create xA name x.logger x.compareTimeout x.wipSleep
